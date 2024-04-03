@@ -1,0 +1,64 @@
+---
+title: "Do we understand why Trump was elected?"
+output: html_notebook
+---
+
+I've noticed in the news lately there is a lot of conversation about why Trump won the presidency in 2016, much of it pointing to middle-class voters who were feeling left-out or squeezed economically. This reasoning was then used to forecast what will happen in 2024 with Biden vs. Trump.
+
+I wanted to do my own analysis to understand if that matched the data.
+
+# What states mattered?
+
+On the surface, we know Trump won in 2016 because he had more votes in the electoral college. This is a good starting point, because if we identify the states that Trump flipped from Obama 2012 then we'll know where to look for *why* those votes changed from Democrat to Republican.
+
+I started with pulling presidential election results from the [MIT Election Data + Science Lab](https://doi.org/10.7910/DVN/VOQCHQ), which contains all results down to the state county for elections 2000-2020, and pulled those into R.
+
+```{r}
+# Reading in data from local
+library(readr)
+raw_county_results <- read_csv("pres_results_by_county_2000-2020/countypres_2000-2020.csv")
+
+# Display results
+library(kableExtra)
+library(tidyverse)
+head(raw_county_results) %>%
+  kable(caption = "Presidential Election Results, 2000-2020") %>%
+  kable_paper()
+```
+
+The county-level votes might be something we get into later, but for now, let's look at what matters--who won each state, and specifically, which states switched from 2012 to 2016?
+
+```{r}
+# Calculate state wide totals
+state_results <- raw_county_results %>% 
+  filter(mode == "TOTAL") %>% 
+  select(year, state, state_po, county_name, candidate, 
+         party, candidatevotes) %>% 
+  group_by(year, state, party) %>% 
+  summarise(votes = sum(candidatevotes, na.rm = T)) %>% 
+  mutate(winner = max(votes) == votes)
+
+# Find those states that switched winners from 2012 to 2016
+flipped_states <- state_results %>% 
+  filter(year == 2012 | year == 2016, winner == T) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(same = +(n_distinct(party) == 1)) %>% 
+  filter(same != 1) %>%
+  select(!c("winner", "same")) %>%
+  arrange(state)
+
+flipped_states %>% 
+  kable(
+    caption = "States flipped between 2012 and 2016",
+        full_width = F
+    ) %>%
+  kable_paper()
+
+flipped_state_names <- flipped_states %>% distinct(state) %>% pull(state)
+```
+
+So here are the states we have to worry about are: `r paste0(substr(flipped_state_names,1,1), tolower(substr(flipped_state_names, 2, nchar(flipped_state_names))))`.
+
+# So what happened in these states?
+
